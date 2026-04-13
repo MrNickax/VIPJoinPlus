@@ -1,0 +1,11 @@
+name: VIPJoinPlus
+version: '${project.version}'
+
+main: com.nickax.vipJoinPlus.VIPJoinPlus
+api-version: '1.21'
+authors: ["Nickax"]
+folia-supported: true
+
+commands:
+  vipjoinplus:
+    description: Main command for VIPJoinPlus
