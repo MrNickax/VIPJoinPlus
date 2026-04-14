@@ -1,5 +1,7 @@
 package com.nickax.vipJoinPlus.message;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -13,5 +15,5 @@ import java.util.List;
  * @param priority    the priority level of this group; higher values take precedence over lower values
  * @param permission  the permission node required for a player to be associated with this group
  */
-public record GroupMessage(List<String> joinMessage, List<String> quitMessage, int priority, String permission) {
+public record GroupMessage(@Nullable List<String> joinMessage, @Nullable List<String> quitMessage, int priority, String permission) {
 }

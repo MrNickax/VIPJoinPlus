@@ -40,8 +40,18 @@ public class GroupMessageManager {
 
             int priority = groupSection.getInt("priority", 0);
             String permission = groupSection.getString("permission", "group." + id);
-            List<String> joinMessage = groupSection.getStringList("join");
-            List<String> quitMessage = groupSection.getStringList("quit");
+
+            List<String> joinMessage = null;
+
+            if (groupSection.contains("join")) {
+                joinMessage = groupSection.getStringList("join");
+            }
+
+            List<String> quitMessage = null;
+
+            if (groupSection.contains("quit")) {
+                quitMessage = groupSection.getStringList("quit");
+            }
 
             groupsByPriority.add(
                     new GroupMessage(joinMessage, quitMessage, priority, permission)

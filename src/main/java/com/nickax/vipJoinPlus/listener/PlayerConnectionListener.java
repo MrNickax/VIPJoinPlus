@@ -119,9 +119,14 @@ public class PlayerConnectionListener implements Listener {
      * @return the formatted Component
      */
     private Component format(List<String> message, String playerName) {
+        if (message == null || message.isEmpty()) {
+            return null;
+        }
+
         List<String> formattedMessage = message.stream()
                 .map(line -> line.replace("%player_name%", playerName))
                 .toList();
+
         return messageFormatter.deserialize(formattedMessage);
     }
 
@@ -133,6 +138,10 @@ public class PlayerConnectionListener implements Listener {
      * @param delay   the delay in ticks before sending the message (0 or less for immediate sending)
      */
     private void sendMessage(Player player, Component message, long delay) {
+        if (message == null) {
+            return;
+        }
+
         Runnable runnable = () -> {
             for (Player onlinePlayer : plugin.getServer().getOnlinePlayers()) {
                 Audience audience = plugin.getAudience(onlinePlayer);

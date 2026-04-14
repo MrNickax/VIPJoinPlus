@@ -51,13 +51,13 @@ groups:
     quit:
       - "<gold>✦ VIP</gold> <gradient:#ffd700:#ff9900>%player_name% left the server!</gradient>"
 
+  # Set join/quit to [] to disable that message for the group.
   # If join/quit is empty and vanilla messages are disabled, nothing will be sent.
   default:
     priority: 0
     join:
       - "<gray>%player_name% joined the server!</gray>"
-    # quit:
-    #   - "<gray>%player_name% left the server!</gray>"
+    quit: []
     
 messages:
   # Message sent to the player after successfully reloading the plugin configuration.
