@@ -2,6 +2,7 @@ package com.nickax.vipJoinPlus.listener;
 
 import com.nickax.vipJoinPlus.VIPJoinPlus;
 import com.nickax.vipJoinPlus.config.MainConfiguration;
+import com.nickax.vipJoinPlus.hook.PlaceholderAPIHook;
 import com.nickax.vipJoinPlus.message.MessageFormatter;
 import com.nickax.vipJoinPlus.message.GroupMessage;
 import com.nickax.vipJoinPlus.message.GroupMessageManager;
@@ -33,6 +34,7 @@ public class PlayerConnectionListener implements Listener {
     private final boolean isAsyncEnabled;
     private final MessageFormatter messageFormatter;
     private final GroupMessageManager groupMessageManager;
+    private final PlaceholderAPIHook placeholderAPIHook;
 
     /**
      * Constructs a new PlayerConnectionListener.
@@ -52,6 +54,7 @@ public class PlayerConnectionListener implements Listener {
 
         this.messageFormatter = plugin.getMessageFormatter();
         this.groupMessageManager = plugin.getGroupMessageManager();
+        this.placeholderAPIHook = plugin.getPlaceholderAPIHook();
     }
 
     /**
@@ -98,14 +101,13 @@ public class PlayerConnectionListener implements Listener {
         if (highestPriorityGroupMessage == null) {
             return;
         }
-
-        String playerName = player.getName();
+        
         List<String> rawMessage = messageExtractor.apply(highestPriorityGroupMessage);
 
         if (isAsyncEnabled) {
-            CompletableFuture.supplyAsync(() -> format(rawMessage, playerName)).thenAccept(message -> sendMessage(player, message, delay));
+            CompletableFuture.supplyAsync(() -> format(rawMessage, player)).thenAccept(message -> sendMessage(player, message, delay));
         } else {
-            Component message = format(rawMessage, playerName);
+            Component message = format(rawMessage, player);
             sendMessage(player, message, delay);
         }
     }
@@ -114,17 +116,25 @@ public class PlayerConnectionListener implements Listener {
      * Formats a list of message strings by replacing placeholders and converting
      * them into a Component using the configured message formatter.
      *
-     * @param message    the list of raw message strings
-     * @param playerName the name of the player to replace in placeholders
-     * @return the formatted Component
+     * @param message the list of raw message strings
+     * @param player  the player to use for placeholder replacement
+     * @return the formatted Component, or null if the message list is null or empty
      */
-    private Component format(List<String> message, String playerName) {
+    private Component format(List<String> message, Player player) {
         if (message == null || message.isEmpty()) {
             return null;
         }
 
         List<String> formattedMessage = message.stream()
-                .map(line -> line.replace("%player_name%", playerName))
+                .map(line -> {
+                    line = line.replace("%player_name%", player.getName());
+
+                    if (placeholderAPIHook != null) {
+                        line = placeholderAPIHook.setPlaceholders(player, line);
+                    }
+
+                    return line;
+                })
                 .toList();
 
         return messageFormatter.deserialize(formattedMessage);

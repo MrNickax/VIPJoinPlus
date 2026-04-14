@@ -2,6 +2,7 @@ package com.nickax.vipJoinPlus;
 
 import com.nickax.vipJoinPlus.command.VIPJoinPlusCommand;
 import com.nickax.vipJoinPlus.config.MainConfiguration;
+import com.nickax.vipJoinPlus.hook.PlaceholderAPIHook;
 import com.nickax.vipJoinPlus.message.LegacyMessageFormatter;
 import com.nickax.vipJoinPlus.message.MessageFormatter;
 import com.nickax.vipJoinPlus.message.MiniMessageMessageFormatter;
@@ -33,6 +34,7 @@ public final class VIPJoinPlus extends JavaPlugin {
     private MainConfiguration mainConfiguration;
     private MessageFormatter messageFormatter;
     private GroupMessageManager groupMessageManager;
+    private PlaceholderAPIHook placeholderAPIHook;
     private final List<Listener> registeredListeners = new ArrayList<>();
 
     /**
@@ -45,6 +47,7 @@ public final class VIPJoinPlus extends JavaPlugin {
         loadMainConfiguration();
         loadMessageFormatter();
         loadGroupMessageManager();
+        loadPlaceholderAPIHook();
         registerListeners();
         registerCommands();
     }
@@ -66,6 +69,7 @@ public final class VIPJoinPlus extends JavaPlugin {
      * This includes reloading the main configuration, message formatter, group messages, and re-registering listeners.
      */
     public void reload() {
+        getLogger().info("Reloading VIPJoinPlus...");
         mainConfiguration.reload();
 
         if (mainConfiguration.isAsyncEnabled()) {
@@ -137,6 +141,16 @@ public final class VIPJoinPlus extends JavaPlugin {
     }
 
     /**
+     * Gets the PlaceholderAPI hook instance.
+     * This hook is used to process PlaceholderAPI placeholders in join and quit messages.
+     *
+     * @return the PlaceholderAPI hook instance, or null if PlaceholderAPI is not available
+     */
+    public PlaceholderAPIHook getPlaceholderAPIHook() {
+        return placeholderAPIHook;
+    }
+
+    /**
      * Initializes the Adventure platform for message handling.
      */
     private void loadAdventure() {
@@ -192,6 +206,21 @@ public final class VIPJoinPlus extends JavaPlugin {
         groupMessageManager.load(mainConfiguration.getGroupsSection());
     }
 
+    /**
+     * Loads and initializes the PlaceholderAPI hook if the PlaceholderAPI plugin is detected.
+     * <p>
+     * This method checks if PlaceholderAPI is installed and enabled on the server.
+     * If detected, it creates a new PlaceholderAPIHook instance to enable placeholder
+     * support in join and quit messages.
+     * </p>
+     */
+    private void loadPlaceholderAPIHook() {
+        if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
+            getLogger().info("PlaceholderAPI hook detected. Enabling PlaceholderAPI support.");
+            placeholderAPIHook = new PlaceholderAPIHook();
+        }
+    }
+    
     /**
      * Registers all event listeners for the plugin.
      * Currently, registers the PlayerConnectionListener for handling join and quit events.
