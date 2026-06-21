@@ -1,20 +1,11 @@
 package com.nickax.vipJoinPlus;
 
+import com.nickax.nexus.bukkit.BukkitNexus;
 import com.nickax.vipJoinPlus.command.VIPJoinPlusCommand;
 import com.nickax.vipJoinPlus.config.MainConfiguration;
 import com.nickax.vipJoinPlus.hook.PlaceholderAPIHook;
-import com.nickax.vipJoinPlus.message.LegacyMessageFormatter;
-import com.nickax.vipJoinPlus.message.MessageFormatter;
-import com.nickax.vipJoinPlus.message.MiniMessageMessageFormatter;
-import com.nickax.vipJoinPlus.message.MixedMessageFormatter;
-import com.nickax.vipJoinPlus.message.GroupMessageManager;
 import com.nickax.vipJoinPlus.listener.PlayerConnectionListener;
-import com.tcoded.folialib.FoliaLib;
-import net.kyori.adventure.audience.Audience;
-import net.kyori.adventure.platform.bukkit.BukkitAudiences;
-import org.bukkit.command.CommandSender;
-import org.bukkit.command.PluginCommand;
-import org.bukkit.entity.Player;
+import com.nickax.vipJoinPlus.message.GroupMessageManager;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -24,28 +15,28 @@ import java.util.List;
 
 /**
  * Main plugin class for VIPJoinPlus.
- * Manages custom join and quit messages for VIP players with group-based configurations.
+ * Manages custom join and quit messages for VIP players with group-based
+ * configurations, built on top of the Nexus core for scheduling, configuration,
+ * commands and message formatting.
  */
 public final class VIPJoinPlus extends JavaPlugin {
 
-    private final FoliaLib foliaLib = new FoliaLib(this);
+    private final List<Listener> registeredListeners = new ArrayList<>();
 
-    private BukkitAudiences adventure;
+    private BukkitNexus nexus;
     private MainConfiguration mainConfiguration;
-    private MessageFormatter messageFormatter;
     private GroupMessageManager groupMessageManager;
     private PlaceholderAPIHook placeholderAPIHook;
-    private final List<Listener> registeredListeners = new ArrayList<>();
 
     /**
      * Called when the plugin is enabled.
-     * Initializes all plugin components including configuration, message formatting, and event listeners.
+     * Resolves the Nexus hub and initializes configuration, group messages,
+     * the PlaceholderAPI hook, event listeners, and commands.
      */
     @Override
     public void onEnable() {
-        loadAdventure();
+        nexus = BukkitNexus.get();
         loadMainConfiguration();
-        loadMessageFormatter();
         loadGroupMessageManager();
         loadPlaceholderAPIHook();
         registerListeners();
@@ -54,19 +45,23 @@ public final class VIPJoinPlus extends JavaPlugin {
 
     /**
      * Called when the plugin is disabled.
-     * Unregisters all listeners, clears resources, and closes the adventure platform.
+     * Unregisters all listeners and clears loaded group messages. Adventure and the
+     * command map are owned by Nexus, so nothing else needs closing here.
      */
     @Override
     public void onDisable() {
         registeredListeners.forEach(HandlerList::unregisterAll);
         registeredListeners.clear();
-        adventure.close();
-        groupMessageManager.clear();
+
+        if (groupMessageManager != null) {
+            groupMessageManager.clear();
+        }
     }
 
     /**
-     * Reloads the plugin configuration and reinitialize components.
-     * This includes reloading the main configuration, message formatter, group messages, and re-registering listeners.
+     * Reloads the plugin configuration and reinitializes components.
+     * Reloads the main configuration and group messages, then re-registers listeners
+     * so they pick up the new settings.
      */
     public void reload() {
         getLogger().info("Reloading VIPJoinPlus...");
@@ -76,7 +71,6 @@ public final class VIPJoinPlus extends JavaPlugin {
             getLogger().info("Async processing is enabled. Join and quit messages will be processed asynchronously for better performance.");
         }
 
-        loadMessageFormatter();
         groupMessageManager.load(mainConfiguration.getGroupsSection());
 
         registeredListeners.forEach(HandlerList::unregisterAll);
@@ -85,32 +79,12 @@ public final class VIPJoinPlus extends JavaPlugin {
     }
 
     /**
-     * Gets the FoliaLib instance for Folia/Paper compatibility.
+     * Gets the Nexus hub.
      *
-     * @return the FoliaLib instance
+     * @return the Nexus hub
      */
-    public FoliaLib getFoliaLib() {
-        return foliaLib;
-    }
-
-    /**
-     * Gets the Adventure audience for a specific player.
-     *
-     * @param player the player to get the audience for
-     * @return the audience instance for the player
-     */
-    public Audience getAudience(Player player) {
-        return adventure.player(player);
-    }
-
-    /**
-     * Gets the Adventure audience for a command sender.
-     *
-     * @param sender the command sender to get the audience for
-     * @return the audience instance for the command sender
-     */
-    public Audience getAudience(CommandSender sender) {
-        return adventure.sender(sender);
+    public BukkitNexus getNexus() {
+        return nexus;
     }
 
     /**
@@ -120,15 +94,6 @@ public final class VIPJoinPlus extends JavaPlugin {
      */
     public MainConfiguration getMainConfiguration() {
         return mainConfiguration;
-    }
-
-    /**
-     * Gets the current message formatter instance.
-     *
-     * @return the message formatter
-     */
-    public MessageFormatter getMessageFormatter() {
-        return messageFormatter;
     }
 
     /**
@@ -142,7 +107,6 @@ public final class VIPJoinPlus extends JavaPlugin {
 
     /**
      * Gets the PlaceholderAPI hook instance.
-     * This hook is used to process PlaceholderAPI placeholders in join and quit messages.
      *
      * @return the PlaceholderAPI hook instance, or null if PlaceholderAPI is not available
      */
@@ -151,50 +115,15 @@ public final class VIPJoinPlus extends JavaPlugin {
     }
 
     /**
-     * Initializes the Adventure platform for message handling.
-     */
-    private void loadAdventure() {
-        adventure = BukkitAudiences.create(this);
-    }
-
-    /**
      * Loads the main configuration file and initializes the configuration instance.
      * Logs a message if async processing is enabled.
      */
     private void loadMainConfiguration() {
-        mainConfiguration = new MainConfiguration(this);
+        mainConfiguration = new MainConfiguration(this, nexus);
         mainConfiguration.load();
 
         if (mainConfiguration.isAsyncEnabled()) {
             getLogger().info("Async processing is enabled. Join and quit messages will be processed asynchronously for better performance.");
-        }
-    }
-
-    /**
-     * Loads and initializes the message formatter based on the configured mode.
-     * Supported modes are: MINI_MESSAGE, LEGACY, and MIXED.
-     * Defaults to MINI_MESSAGE if an invalid mode is specified.
-     */
-    private void loadMessageFormatter() {
-        String mode = mainConfiguration.getMessageFormatterMode();
-
-        switch (mode.toUpperCase()) {
-            case "MINI_MESSAGE":
-                messageFormatter = new MiniMessageMessageFormatter();
-                getLogger().info("Message formatter mode set to MINI_MESSAGE.");
-                break;
-            case "LEGACY":
-                messageFormatter = new LegacyMessageFormatter();
-                getLogger().info("Message formatter mode set to LEGACY.");
-                break;
-            case "MIXED":
-                messageFormatter = new MixedMessageFormatter();
-                getLogger().info("Message formatter mode set to MIXED.");
-                break;
-            default:
-                messageFormatter = new MiniMessageMessageFormatter();
-                getLogger().warning("Invalid message formatter mode '" + mode + "'. Defaulting to MINI_MESSAGE. Valid modes are: MINI_MESSAGE, LEGACY, MIXED.");
-                break;
         }
     }
 
@@ -208,11 +137,6 @@ public final class VIPJoinPlus extends JavaPlugin {
 
     /**
      * Loads and initializes the PlaceholderAPI hook if the PlaceholderAPI plugin is detected.
-     * <p>
-     * This method checks if PlaceholderAPI is installed and enabled on the server.
-     * If detected, it creates a new PlaceholderAPIHook instance to enable placeholder
-     * support in join and quit messages.
-     * </p>
      */
     private void loadPlaceholderAPIHook() {
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
@@ -220,10 +144,9 @@ public final class VIPJoinPlus extends JavaPlugin {
             placeholderAPIHook = new PlaceholderAPIHook();
         }
     }
-    
+
     /**
      * Registers all event listeners for the plugin.
-     * Currently, registers the PlayerConnectionListener for handling join and quit events.
      */
     private void registerListeners() {
         PlayerConnectionListener playerConnectionListener = new PlayerConnectionListener(this);
@@ -234,17 +157,9 @@ public final class VIPJoinPlus extends JavaPlugin {
     }
 
     /**
-     * Registers the plugin commands.
-     * Sets up the /vipjoinplus command executor.
+     * Registers the {@code /vipjoinplus} command through the Nexus command engine.
      */
     private void registerCommands() {
-        PluginCommand command = getCommand("vipjoinplus");
-
-        if (command == null) {
-            getLogger().severe("VIPJoinPlus command could not be registered. Please notify the developer about this issue.");
-            return;
-        }
-
-        command.setExecutor(new VIPJoinPlusCommand(this));
+        nexus.commands().register(new VIPJoinPlusCommand(this).build());
     }
 }

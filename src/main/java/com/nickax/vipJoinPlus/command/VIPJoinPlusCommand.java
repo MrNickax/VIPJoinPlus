@@ -1,75 +1,62 @@
 package com.nickax.vipJoinPlus.command;
 
+import com.nickax.nexus.api.command.Command;
+import com.nickax.nexus.bukkit.BukkitNexus;
+import com.nickax.nexus.bukkit.command.BukkitSender;
 import com.nickax.vipJoinPlus.VIPJoinPlus;
-import net.kyori.adventure.audience.Audience;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
+import com.nickax.vipJoinPlus.config.MainConfiguration;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabCompleter;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
-
-import java.util.List;
 
 /**
- * Command executor for the VIPJoinPlus plugin commands.
- * Handles the /vipjoinplus command and its subcommands.
+ * Builds the {@code /vipjoinplus} command on top of the Nexus command engine.
+ * Provides the {@code reload} subcommand; permission is checked inside the executor so
+ * the feedback message honours the plugin's configured formatting mode.
  */
-public class VIPJoinPlusCommand implements CommandExecutor, TabCompleter {
+public class VIPJoinPlusCommand {
 
     private final VIPJoinPlus plugin;
+    private final BukkitNexus nexus;
 
     /**
-     * Constructs a new VIPJoinPlusCommand instance.
+     * Constructs a new VIPJoinPlusCommand builder.
      *
      * @param plugin the VIPJoinPlus plugin instance
      */
     public VIPJoinPlusCommand(VIPJoinPlus plugin) {
         this.plugin = plugin;
+        this.nexus = plugin.getNexus();
     }
 
     /**
-     * Executes the command when called by a command sender.
+     * Builds the Nexus command tree for {@code /vipjoinplus}.
      *
-     * @param sender  the command sender who executed the command
-     * @param command the command that was executed
-     * @param label   the alias of the command that was used
-     * @param args    the arguments passed to the command
-     * @return true if the command was handled successfully, false otherwise
+     * @return the built command, ready to register with {@code nexus.commands()}
      */
-    @Override
-    public boolean onCommand(@NonNull CommandSender sender, @NonNull Command command, @NonNull String label, @NonNull String[] args) {
-        Audience audience = plugin.getAudience(sender);
+    public Command build() {
+        Command reload = Command.named("reload")
+                .executes(ctx -> handleReload(((BukkitSender) ctx.sender()).bukkit()))
+                .build();
 
-        if (args.length == 1) {
-            if (args[0].equalsIgnoreCase("reload")) {
-                if (sender.hasPermission("vipjoinplus.reload")) {
-                    plugin.reload();
-                    audience.sendMessage(plugin.getMessageFormatter().deserialize(plugin.getMainConfiguration().getReloadMessage()));
-                } else {
-                    audience.sendMessage(plugin.getMessageFormatter().deserialize(plugin.getMainConfiguration().getNoPermissionMessage()));
-                }
-                return true;
-            }
-        }
-
-        return false;
+        return Command.named("vipjoinplus")
+                .subcommand(reload)
+                .build();
     }
 
     /**
-     * Provides tab completion suggestions for the command.
+     * Reloads the plugin when the sender is permitted, otherwise sends the configured
+     * no-permission message. Both messages are formatted with the configured mode.
      *
-     * @param sender  the command sender requesting tab completion
-     * @param command the command being tab completed
-     * @param label   the alias of the command that was used
-     * @param args    the arguments passed to the command so far
-     * @return a list of tab completion suggestions, or an empty list if none
+     * @param sender the sender that ran the command
      */
-    @Override
-    public @Nullable List<String> onTabComplete(@NonNull CommandSender sender, @NonNull Command command, @NonNull String label, @NonNull String[] args) {
-        if (args.length == 1) {
-            return List.of("reload");
+    private void handleReload(CommandSender sender) {
+        MainConfiguration configuration = plugin.getMainConfiguration();
+
+        if (!sender.hasPermission("vipjoinplus.reload")) {
+            nexus.messages().send(sender, configuration.getFormat(), configuration.getNoPermissionMessage());
+            return;
         }
-        return List.of();
+
+        plugin.reload();
+        nexus.messages().send(sender, configuration.getFormat(), configuration.getReloadMessage());
     }
 }
