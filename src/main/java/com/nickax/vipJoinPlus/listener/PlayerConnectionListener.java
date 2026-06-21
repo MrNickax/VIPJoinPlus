@@ -1,38 +1,40 @@
 package com.nickax.vipJoinPlus.listener;
 
+import com.nickax.nexus.api.text.TextFormat;
+import com.nickax.nexus.bukkit.BukkitNexus;
+import com.nickax.nexus.bukkit.schedule.BukkitScheduler;
 import com.nickax.vipJoinPlus.VIPJoinPlus;
 import com.nickax.vipJoinPlus.config.MainConfiguration;
 import com.nickax.vipJoinPlus.hook.PlaceholderAPIHook;
-import com.nickax.vipJoinPlus.message.MessageFormatter;
 import com.nickax.vipJoinPlus.message.GroupMessage;
 import com.nickax.vipJoinPlus.message.GroupMessageManager;
-import com.tcoded.folialib.impl.PlatformScheduler;
-import net.kyori.adventure.audience.Audience;
-import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 /**
- * Listener that handles player connection events (join and quit) and displays
- * custom messages based on player group permissions.
+ * Listener that handles player connection events (join and quit) and broadcasts
+ * custom messages based on player group permissions, formatting and delivery handled
+ * by Nexus.
  */
 public class PlayerConnectionListener implements Listener {
 
-    private final VIPJoinPlus plugin;
-    private final PlatformScheduler scheduler;
+    private static final long MILLIS_PER_TICK = 50L;
+
+    private final BukkitNexus nexus;
+    private final BukkitScheduler scheduler;
+    private final TextFormat format;
     private final boolean isVanillaJoinMessageDisabled;
     private final boolean isVanillaQuitMessageDisabled;
     private final long joinMessageDelay;
     private final long quitMessageDelay;
     private final boolean isAsyncEnabled;
-    private final MessageFormatter messageFormatter;
     private final GroupMessageManager groupMessageManager;
     private final PlaceholderAPIHook placeholderAPIHook;
 
@@ -42,26 +44,26 @@ public class PlayerConnectionListener implements Listener {
      * @param plugin the VIPJoinPlus plugin instance
      */
     public PlayerConnectionListener(VIPJoinPlus plugin) {
-        this.plugin = plugin;
-        this.scheduler = plugin.getFoliaLib().getScheduler();
+        this.nexus = plugin.getNexus();
+        this.scheduler = nexus.scheduler();
 
         MainConfiguration mainConfiguration = plugin.getMainConfiguration();
-        isVanillaJoinMessageDisabled = mainConfiguration.isVanillaJoinMessageDisabled();
-        isVanillaQuitMessageDisabled = mainConfiguration.isVanillaQuitMessageDisabled();
-        joinMessageDelay = mainConfiguration.getJoinMessageDelay();
-        quitMessageDelay = mainConfiguration.getQuitMessageDelay();
-        isAsyncEnabled = mainConfiguration.isAsyncEnabled();
+        this.format = mainConfiguration.getFormat();
+        this.isVanillaJoinMessageDisabled = mainConfiguration.isVanillaJoinMessageDisabled();
+        this.isVanillaQuitMessageDisabled = mainConfiguration.isVanillaQuitMessageDisabled();
+        this.joinMessageDelay = mainConfiguration.getJoinMessageDelay();
+        this.quitMessageDelay = mainConfiguration.getQuitMessageDelay();
+        this.isAsyncEnabled = mainConfiguration.isAsyncEnabled();
 
-        this.messageFormatter = plugin.getMessageFormatter();
         this.groupMessageManager = plugin.getGroupMessageManager();
         this.placeholderAPIHook = plugin.getPlaceholderAPIHook();
     }
 
     /**
      * Handles player join events. Optionally disables the vanilla join message
-     * and displays a custom join message based on the player's group.
+     * and broadcasts a custom join message based on the player's group.
      *
-     * @param event the player joins the event
+     * @param event the player join event
      */
     @EventHandler
     private void onPlayerJoin(PlayerJoinEvent event) {
@@ -74,9 +76,9 @@ public class PlayerConnectionListener implements Listener {
 
     /**
      * Handles player quit events. Optionally disables the vanilla quit message
-     * and displays a custom quit message based on the player's group.
+     * and broadcasts a custom quit message based on the player's group.
      *
-     * @param event the player quit the event
+     * @param event the player quit event
      */
     @EventHandler
     private void onPlayerQuit(PlayerQuitEvent event) {
@@ -88,12 +90,11 @@ public class PlayerConnectionListener implements Listener {
     }
 
     /**
-     * Handles the processing and sending of connection messages (join or quit).
-     * Retrieves the highest priority group message for the player and sends it
-     * with the configured delay.
+     * Resolves the highest priority group message for the player and broadcasts it,
+     * honouring the configured delay and async settings.
      *
      * @param player           the player who connected or disconnected
-     * @param delay            the delay in ticks before sending the message
+     * @param delay            the delay in ticks before broadcasting the message
      * @param messageExtractor function to extract the message list from a GroupMessage
      */
     private void handleConnectionMessage(Player player, long delay, Function<GroupMessage, List<String>> messageExtractor) {
@@ -101,31 +102,40 @@ public class PlayerConnectionListener implements Listener {
         if (highestPriorityGroupMessage == null) {
             return;
         }
-        
-        List<String> rawMessage = messageExtractor.apply(highestPriorityGroupMessage);
 
+        List<String> rawMessage = messageExtractor.apply(highestPriorityGroupMessage);
+        if (rawMessage == null || rawMessage.isEmpty()) {
+            return;
+        }
+
+        Runnable task = () -> nexus.messages().broadcast(format, applyPlaceholders(rawMessage, player));
+
+        if (delay <= 0) {
+            if (isAsyncEnabled) {
+                scheduler.async(task);
+            } else {
+                task.run();
+            }
+            return;
+        }
+
+        Duration duration = Duration.ofMillis(delay * MILLIS_PER_TICK);
         if (isAsyncEnabled) {
-            CompletableFuture.supplyAsync(() -> format(rawMessage, player)).thenAccept(message -> sendMessage(player, message, delay));
+            scheduler.asyncLater(duration, task);
         } else {
-            Component message = format(rawMessage, player);
-            sendMessage(player, message, delay);
+            scheduler.entityLater(player, duration, task);
         }
     }
 
     /**
-     * Formats a list of message strings by replacing placeholders and converting
-     * them into a Component using the configured message formatter.
+     * Replaces the player-name token and any PlaceholderAPI placeholders in each line.
      *
-     * @param message the list of raw message strings
-     * @param player  the player to use for placeholder replacement
-     * @return the formatted Component, or null if the message list is null or empty
+     * @param message the raw message lines
+     * @param player  the player used for placeholder resolution
+     * @return the lines with placeholders replaced
      */
-    private Component format(List<String> message, Player player) {
-        if (message == null || message.isEmpty()) {
-            return null;
-        }
-
-        List<String> formattedMessage = message.stream()
+    private List<String> applyPlaceholders(List<String> message, Player player) {
+        return message.stream()
                 .map(line -> {
                     line = line.replace("%player_name%", player.getName());
 
@@ -136,49 +146,5 @@ public class PlayerConnectionListener implements Listener {
                     return line;
                 })
                 .toList();
-
-        return messageFormatter.deserialize(formattedMessage);
-    }
-
-    /**
-     * Sends a message to all online players, either immediately or after a delay.
-     *
-     * @param player  the player associated with the message (used for entity-based scheduling)
-     * @param message the formatted message Component to send
-     * @param delay   the delay in ticks before sending the message (0 or less for immediate sending)
-     */
-    private void sendMessage(Player player, Component message, long delay) {
-        if (message == null) {
-            return;
-        }
-
-        Runnable runnable = () -> {
-            for (Player onlinePlayer : plugin.getServer().getOnlinePlayers()) {
-                Audience audience = plugin.getAudience(onlinePlayer);
-                audience.sendMessage(message);
-            }
-        };
-
-        if (delay <= 0) {
-            runnable.run();
-        } else {
-            scheduleMessage(player, runnable, delay);
-        }
-    }
-
-    /**
-     * Schedules a message to be sent after a delay. Uses async scheduling if enabled,
-     * otherwise uses entity-based scheduling.
-     *
-     * @param player   the player associated with the message (used for entity-based scheduling)
-     * @param runnable the task to execute
-     * @param delay    the delay in ticks before executing the task
-     */
-    private void scheduleMessage(Player player, Runnable runnable, long delay) {
-        if (isAsyncEnabled) {
-            scheduler.runLaterAsync(runnable, delay);
-        } else {
-            scheduler.runAtEntityLater(player, runnable, delay);
-        }
     }
 }

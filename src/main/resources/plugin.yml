@@ -5,8 +5,5 @@ main: com.nickax.vipJoinPlus.VIPJoinPlus
 api-version: '1.21'
 authors: ["Nickax"]
 folia-supported: true
+depend: ["Nexus"]
 softdepend: ["PlaceholderAPI"]
-
-commands:
-  vipjoinplus:
-    description: Main command for VIPJoinPlus

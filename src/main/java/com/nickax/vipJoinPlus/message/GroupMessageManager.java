@@ -1,6 +1,6 @@
 package com.nickax.vipJoinPlus.message;
 
-import org.bukkit.configuration.ConfigurationSection;
+import com.nickax.nexus.api.config.ConfigSection;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
@@ -9,7 +9,7 @@ import java.util.List;
 
 /**
  * Manages group-based join and quit messages for players.
- * This class loads group configurations from the configuration file,
+ * This class loads group configurations from a Nexus configuration section,
  * stores them sorted by priority, and provides access to the appropriate
  * group message based on player permissions.
  */
@@ -22,17 +22,17 @@ public class GroupMessageManager {
      * Clears existing groups before loading new ones. Groups are sorted by priority
      * in descending order after loading.
      *
-     * @param section the configuration section containing group definitions or null to clear all groups
+     * @param section the section containing group definitions, or null to clear all groups
      */
-    public void load(ConfigurationSection section) {
+    public void load(ConfigSection section) {
         clear();
 
         if (section == null) {
             return;
         }
 
-        for (String id : section.getKeys(false)) {
-            ConfigurationSection groupSection = section.getConfigurationSection(id);
+        for (String id : section.keys()) {
+            ConfigSection groupSection = section.getSection(id);
 
             if (groupSection == null) {
                 continue;

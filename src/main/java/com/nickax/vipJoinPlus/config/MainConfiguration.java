@@ -1,51 +1,69 @@
 package com.nickax.vipJoinPlus.config;
 
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.FileConfiguration;
+import com.nickax.nexus.api.config.Config;
+import com.nickax.nexus.api.config.ConfigSection;
+import com.nickax.nexus.api.text.TextFormat;
+import com.nickax.nexus.bukkit.BukkitNexus;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.nio.file.Path;
 
 /**
  * Main configuration handler for the VIPJoinPlus plugin.
- * Manages loading, reloading, and accessing configuration values.
+ * Loads {@code config.yml} through Nexus and exposes typed accessors for the rest of
+ * the plugin. The file lives in the plugin's own data folder; Nexus creates it from
+ * the bundled defaults on first run and merges any missing keys.
  */
 public class MainConfiguration {
 
     private final JavaPlugin plugin;
-    private FileConfiguration config;
+    private final BukkitNexus nexus;
+
+    private Config config;
 
     /**
-     * Constructs a new MainConfiguration instance.
+     * Constructs a new MainConfiguration.
      *
-     * @param plugin the JavaPlugin instance
+     * @param plugin the owning plugin, used for the data folder and bundled defaults
+     * @param nexus  the Nexus hub providing the config service
      */
-    public MainConfiguration(JavaPlugin plugin) {
+    public MainConfiguration(JavaPlugin plugin, BukkitNexus nexus) {
         this.plugin = plugin;
+        this.nexus = nexus;
     }
 
     /**
-     * Loads the configuration file.
-     * Saves the default config if it doesn't exist and loads it into memory.
+     * Loads the configuration file, creating it from the bundled defaults if absent.
      */
     public void load() {
-        plugin.saveDefaultConfig();
-        config = plugin.getConfig();
+        Path file = plugin.getDataFolder().toPath().resolve("config.yml");
+        config = nexus.configs().load(file, plugin.getResource("config.yml"));
     }
 
     /**
-     * Reloads the configuration file from disk.
+     * Reloads the configuration file from disk, discarding unsaved changes.
      */
     public void reload() {
-        plugin.reloadConfig();
-        config = plugin.getConfig();
+        config.reload();
     }
 
     /**
-     * Gets the message formatter mode from the configuration.
+     * Gets the formatting dialect used for join/quit and command messages.
+     * Falls back to {@link TextFormat#MINI_MESSAGE} when the configured value is
+     * missing or not a recognised mode.
      *
-     * @return the message formatter mode (e.g., "MINI_MESSAGE", "LEGACY", "MIXED")
+     * @return the configured text format
      */
-    public String getMessageFormatterMode() {
-        return config.getString("behavior.message-formatter-mode");
+    public TextFormat getFormat() {
+        String mode = config.getString("behavior.message-formatter-mode", "MINI_MESSAGE");
+
+        try {
+            return TextFormat.valueOf(mode.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            plugin.getLogger().warning("Invalid message-formatter-mode '" + mode
+                    + "'. Defaulting to MINI_MESSAGE. Valid modes are: MINI_MESSAGE, LEGACY, MIXED.");
+            return TextFormat.MINI_MESSAGE;
+        }
     }
 
     /**
@@ -72,13 +90,7 @@ public class MainConfiguration {
      * @return the delay in ticks, or 0 if not configured
      */
     public long getJoinMessageDelay() {
-        String delay = config.getString("behavior.join-message-delay");
-
-        if (delay == null) {
-            return 0;
-        }
-
-        return Long.parseLong(delay);
+        return config.getLong("behavior.join-message-delay", 0);
     }
 
     /**
@@ -87,13 +99,7 @@ public class MainConfiguration {
      * @return the delay in ticks, or 0 if not configured
      */
     public long getQuitMessageDelay() {
-        String delay = config.getString("behavior.quit-message-delay");
-
-        if (delay == null) {
-            return 0;
-        }
-
-        return Long.parseLong(delay);
+        return config.getLong("behavior.quit-message-delay", 0);
     }
 
     /**
@@ -108,10 +114,10 @@ public class MainConfiguration {
     /**
      * Gets the groups configuration section.
      *
-     * @return the ConfigurationSection containing group definitions, or null if not present
+     * @return the section containing group definitions, or null if not present
      */
-    public ConfigurationSection getGroupsSection() {
-        return config.getConfigurationSection("groups");
+    public ConfigSection getGroupsSection() {
+        return config.getSection("groups");
     }
 
     /**
@@ -120,15 +126,15 @@ public class MainConfiguration {
      * @return the reload message string
      */
     public String getReloadMessage() {
-        return config.getString("messages.reload");
+        return config.getString("messages.reload", "");
     }
 
     /**
-     * Gets the no permission message from the configuration.
+     * Gets the no-permission message from the configuration.
      *
-     * @return the no permission message string
+     * @return the no-permission message string
      */
     public String getNoPermissionMessage() {
-        return config.getString("messages.no-permission");
+        return config.getString("messages.no-permission", "");
     }
 }
