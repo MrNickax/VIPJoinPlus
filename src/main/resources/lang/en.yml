@@ -1,0 +1,22 @@
+# VIPJoinPlus — English messages.
+# Markup follows behavior.message-formatter-mode in config.yml (MINI_MESSAGE by default).
+# To add a language, copy this file to lang/<id>.yml (e.g. lang/fr.yml) and translate the values.
+# Placeholder: {player_name}. PlaceholderAPI %placeholders% also work when PlaceholderAPI is installed.
+
+reload: '<green>VIPJoinPlus has been reloaded!</green>'
+no-permission: '<red>You do not have permission to use this command!</red>'
+
+# Per-group join/quit broadcasts. Each group id here must match a group in config.yml.
+# Every line is shown to every online player in their own language. Leave a value
+# empty ('') to send nothing for that group/event.
+groups:
+  vip:
+    join:
+      - "<gold>✦ VIP</gold> <gradient:#ffd700:#ff9900>{player_name} joined the server!</gradient>"
+    quit:
+      - "<gold>✦ VIP</gold> <gradient:#ffd700:#ff9900>{player_name} left the server!</gradient>"
+
+  default:
+    join:
+      - "<gray>{player_name} joined the server!</gray>"
+    quit: ''

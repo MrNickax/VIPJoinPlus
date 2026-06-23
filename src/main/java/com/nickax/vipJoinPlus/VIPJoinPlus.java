@@ -1,61 +1,67 @@
 package com.nickax.vipJoinPlus;
 
+import com.nickax.nexus.api.lang.Lang;
 import com.nickax.nexus.bukkit.BukkitNexus;
 import com.nickax.vipJoinPlus.command.VIPJoinPlusCommand;
 import com.nickax.vipJoinPlus.config.MainConfiguration;
 import com.nickax.vipJoinPlus.hook.PlaceholderAPIHook;
 import com.nickax.vipJoinPlus.listener.PlayerConnectionListener;
 import com.nickax.vipJoinPlus.message.GroupMessageManager;
-import org.bukkit.event.HandlerList;
-import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
-
-import java.util.ArrayList;
-import java.util.List;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Main plugin class for VIPJoinPlus.
- * Manages custom join and quit messages for VIP players with group-based
- * configurations, built on top of the Nexus core for scheduling, configuration,
- * commands and message formatting.
+ * VIPJoinPlus: configurable, per-group join and quit messages built on Nexus. Group
+ * definitions (priority + permission) live in {@code config.yml}; the message text lives in
+ * the {@code lang/} folder so every player sees the broadcast in their own client language.
+ * Listeners and commands are registered through Nexus with this plugin as the owner, so a
+ * PlugMan-style unload/reload leaves no stale or duplicate handlers.
  */
 public final class VIPJoinPlus extends JavaPlugin {
-
-    private final List<Listener> registeredListeners = new ArrayList<>();
 
     private BukkitNexus nexus;
     private MainConfiguration mainConfiguration;
     private GroupMessageManager groupMessageManager;
-    private PlaceholderAPIHook placeholderAPIHook;
+    private Lang lang;
+    private @Nullable PlaceholderAPIHook placeholderAPIHook;
 
     /**
-     * Called when the plugin is enabled.
-     * Resolves the Nexus hub and initializes configuration, group messages,
-     * the PlaceholderAPI hook, event listeners, and commands.
+     * Enables the plugin: resolves the Nexus hub, loads the configuration and language
+     * bundles, builds the group definitions, wires the PlaceholderAPI hook (if present),
+     * and registers the connection listener and command under this plugin's ownership.
      */
     @Override
     public void onEnable() {
         nexus = BukkitNexus.get();
-        loadMainConfiguration();
-        loadGroupMessageManager();
+
+        mainConfiguration = new MainConfiguration(this, nexus, this::debug);
+        mainConfiguration.load();
+        lang = mainConfiguration.loadLang();
+        debug("Enabling VIPJoinPlus (default locale=" + mainConfiguration.getDefaultLanguage() + ")");
+
+        groupMessageManager = new GroupMessageManager(this::debug);
+        groupMessageManager.load(mainConfiguration.getGroupsSection());
+
         loadPlaceholderAPIHook();
-        registerListeners();
-        registerCommands();
+
+        nexus.listeners().register(this, new PlayerConnectionListener(this));
+        nexus.commands().register(this, new VIPJoinPlusCommand(this).build());
+        debug("Registered listeners and commands");
     }
 
     /**
-     * Called when the plugin is disabled.
-     * Unregisters all listeners and clears loaded group messages. Adventure and the
-     * command map are owned by Nexus, so nothing else needs closing here.
+     * Disables the plugin: unregisters this plugin's own listeners and commands and clears
+     * the loaded group definitions. Only this plugin's handlers are removed, so other
+     * plugins are untouched on a reload.
      */
     @Override
     public void onDisable() {
+        debug("Disabling VIPJoinPlus");
+
         if (nexus != null) {
             nexus.commands().unregister(this);
+            nexus.listeners().unregister(this);
         }
-
-        registeredListeners.forEach(HandlerList::unregisterAll);
-        registeredListeners.clear();
 
         if (groupMessageManager != null) {
             groupMessageManager.clear();
@@ -63,27 +69,19 @@ public final class VIPJoinPlus extends JavaPlugin {
     }
 
     /**
-     * Reloads the plugin configuration and reinitializes components.
-     * Reloads the main configuration and group messages, then re-registers listeners
-     * so they pick up the new settings.
+     * Reloads the configuration, language bundles and group definitions. Listeners read
+     * configuration and language live, so they need not be re-registered.
      */
     public void reload() {
         getLogger().info("Reloading VIPJoinPlus...");
         mainConfiguration.reload();
-
-        if (mainConfiguration.isAsyncEnabled()) {
-            getLogger().info("Async processing is enabled. Join and quit messages will be processed asynchronously for better performance.");
-        }
-
+        lang = mainConfiguration.loadLang();
         groupMessageManager.load(mainConfiguration.getGroupsSection());
-
-        registeredListeners.forEach(HandlerList::unregisterAll);
-        registeredListeners.clear();
-        registerListeners();
+        debug("Reload complete");
     }
 
     /**
-     * Gets the Nexus hub.
+     * Returns the Nexus hub.
      *
      * @return the Nexus hub
      */
@@ -92,7 +90,7 @@ public final class VIPJoinPlus extends JavaPlugin {
     }
 
     /**
-     * Gets the main configuration instance.
+     * Returns the main configuration handler.
      *
      * @return the main configuration
      */
@@ -101,7 +99,7 @@ public final class VIPJoinPlus extends JavaPlugin {
     }
 
     /**
-     * Gets the group message manager instance.
+     * Returns the group message manager.
      *
      * @return the group message manager
      */
@@ -110,60 +108,47 @@ public final class VIPJoinPlus extends JavaPlugin {
     }
 
     /**
-     * Gets the PlaceholderAPI hook instance.
+     * Returns the current language bundles. The instance is rebuilt on reload, so callers
+     * should read it fresh rather than caching it.
      *
-     * @return the PlaceholderAPI hook instance, or null if PlaceholderAPI is not available
+     * @return the current lang
      */
-    public PlaceholderAPIHook getPlaceholderAPIHook() {
+    public Lang getLang() {
+        return lang;
+    }
+
+    /**
+     * Returns the PlaceholderAPI hook.
+     *
+     * @return the hook, or {@code null} if PlaceholderAPI is not installed
+     */
+    public @Nullable PlaceholderAPIHook getPlaceholderAPIHook() {
         return placeholderAPIHook;
     }
 
     /**
-     * Loads the main configuration file and initializes the configuration instance.
-     * Logs a message if async processing is enabled.
+     * Logs a message at INFO level when debug mode is enabled, no-op otherwise. Centralised
+     * here so every component reports through {@code this::debug}: the gate is read live
+     * from config, so toggling {@code debug} and running {@code /vipjoinplus reload} takes
+     * effect immediately. Safe to call before the configuration has loaded (treated as
+     * disabled).
+     *
+     * @param message the debug message
      */
-    private void loadMainConfiguration() {
-        mainConfiguration = new MainConfiguration(this, nexus);
-        mainConfiguration.load();
-
-        if (mainConfiguration.isAsyncEnabled()) {
-            getLogger().info("Async processing is enabled. Join and quit messages will be processed asynchronously for better performance.");
+    public void debug(String message) {
+        if (mainConfiguration != null && mainConfiguration.isDebug()) {
+            getLogger().info("[debug] " + message);
         }
     }
 
     /**
-     * Initializes the group message manager and loads group configurations.
-     */
-    private void loadGroupMessageManager() {
-        groupMessageManager = new GroupMessageManager();
-        groupMessageManager.load(mainConfiguration.getGroupsSection());
-    }
-
-    /**
-     * Loads and initializes the PlaceholderAPI hook if the PlaceholderAPI plugin is detected.
+     * Initializes the PlaceholderAPI hook if the PlaceholderAPI plugin is present.
      */
     private void loadPlaceholderAPIHook() {
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
-            getLogger().info("PlaceholderAPI hook detected. Enabling PlaceholderAPI support.");
+            getLogger().info("Hooked into PlaceholderAPI!");
             placeholderAPIHook = new PlaceholderAPIHook();
+            debug("PlaceholderAPI hook enabled");
         }
-    }
-
-    /**
-     * Registers all event listeners for the plugin.
-     */
-    private void registerListeners() {
-        PlayerConnectionListener playerConnectionListener = new PlayerConnectionListener(this);
-
-        getServer().getPluginManager().registerEvents(playerConnectionListener, this);
-
-        registeredListeners.add(playerConnectionListener);
-    }
-
-    /**
-     * Registers the {@code /vipjoinplus} command through the Nexus command engine.
-     */
-    private void registerCommands() {
-        nexus.commands().register(this, new VIPJoinPlusCommand(this).build());
     }
 }

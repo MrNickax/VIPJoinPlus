@@ -6,28 +6,39 @@ import org.bukkit.entity.Player;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
- * Manages group-based join and quit messages for players.
- * This class loads group configurations from a Nexus configuration section,
- * stores them sorted by priority, and provides access to the appropriate
- * group message based on player permissions.
+ * Loads the group definitions (priority + permission) from the {@code groups} config
+ * section, keeps them sorted by descending priority, and resolves the highest-priority
+ * group a player belongs to. The join/quit text itself is not stored here; it is looked
+ * up per recipient from the localized {@code lang} bundles using the group id.
  */
 public class GroupMessageManager {
 
     private final List<GroupMessage> groupsByPriority = new ArrayList<>();
+    private final Consumer<String> debug;
 
     /**
-     * Loads group message configurations from the provided configuration section.
-     * Clears existing groups before loading new ones. Groups are sorted by priority
-     * in descending order after loading.
+     * Constructs the manager.
      *
-     * @param section the section containing group definitions, or null to clear all groups
+     * @param debug the centralized debug sink (no-op when debug mode is off)
+     */
+    public GroupMessageManager(Consumer<String> debug) {
+        this.debug = debug;
+    }
+
+    /**
+     * Loads the group definitions from the provided section, replacing any previously
+     * loaded ones and re-sorting by descending priority.
+     *
+     * @param section the {@code groups} section, or {@code null} to clear all groups
      */
     public void load(ConfigSection section) {
         clear();
 
         if (section == null) {
+            debug.accept("Loaded 0 group(s) (no groups section)");
             return;
         }
 
@@ -41,33 +52,18 @@ public class GroupMessageManager {
             int priority = groupSection.getInt("priority", 0);
             String permission = groupSection.getString("permission", "group." + id);
 
-            List<String> joinMessage = null;
-
-            if (groupSection.contains("join")) {
-                joinMessage = groupSection.getStringList("join");
-            }
-
-            List<String> quitMessage = null;
-
-            if (groupSection.contains("quit")) {
-                quitMessage = groupSection.getStringList("quit");
-            }
-
-            groupsByPriority.add(
-                    new GroupMessage(joinMessage, quitMessage, priority, permission)
-            );
+            groupsByPriority.add(new GroupMessage(id, priority, permission));
         }
 
         groupsByPriority.sort(Comparator.comparingInt(GroupMessage::priority).reversed());
+        debug.accept("Loaded " + groupsByPriority.size() + " group(s)");
     }
 
     /**
-     * Retrieves the highest priority group message that the player has permission for.
-     * Groups are checked in descending priority order, and the first group for which
-     * the player has the required permission is returned.
+     * Returns the highest-priority group the player has permission for.
      *
-     * @param player the player to check permissions for
-     * @return the highest priority GroupMessage the player has permission for, or null if none found
+     * @param player the player to match
+     * @return the matched group, or {@code null} if the player matches no group
      */
     public GroupMessage getHighestPriorityGroupMessage(Player player) {
         for (GroupMessage groupMessage : groupsByPriority) {
@@ -79,7 +75,7 @@ public class GroupMessageManager {
     }
 
     /**
-     * Clears all loaded group messages from the manager.
+     * Clears all loaded group definitions.
      */
     public void clear() {
         groupsByPriority.clear();

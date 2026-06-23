@@ -1,19 +1,15 @@
 package com.nickax.vipJoinPlus.message;
 
-import org.jetbrains.annotations.Nullable;
-
-import java.util.List;
-
 /**
- * Represents a group-based message configuration for player to join and quit events.
- * Each group has custom join and quit messages, a priority for determining precedence,
- * and a permission node that controls which players have access to this group's messages.
- * Groups with higher priority values take precedence when a player has permissions for multiple groups.
+ * Definition of a VIPJoinPlus group: its matching rule (a permission) and its precedence
+ * (a priority). The actual join/quit text is no longer held here; it lives in the
+ * {@code lang/<locale>.yml} files under {@code groups.<id>.join} / {@code groups.<id>.quit}
+ * so it can be localized per player. Groups with a higher priority take precedence when a
+ * player matches several of them.
  *
- * @param joinMessage the list of message lines to display when a player with this group's permission joins
- * @param quitMessage the list of message lines to display when a player with this group's permission quits
- * @param priority    the priority level of this group; higher values take precedence over lower values
- * @param permission  the permission node required for a player to be associated with this group
+ * @param id         the group id, also used as the lang key prefix ({@code groups.<id>.*})
+ * @param priority   the priority; higher values win over lower ones
+ * @param permission the permission node a player must have to belong to this group
  */
-public record GroupMessage(@Nullable List<String> joinMessage, @Nullable List<String> quitMessage, int priority, String permission) {
+public record GroupMessage(String id, int priority, String permission) {
 }

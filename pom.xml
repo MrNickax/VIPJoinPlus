@@ -6,7 +6,7 @@
 
     <groupId>com.nickax</groupId>
     <artifactId>VIPJoinPlus</artifactId>
-    <version>1.0.2</version>
+    <version>2.0.0</version>
     <packaging>jar</packaging>
 
     <name>VIPJoinPlus</name>
@@ -14,7 +14,7 @@
     <properties>
         <java.version>21</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <nexus.version>1.0.0-SNAPSHOT</nexus.version>
+        <nexus.version>1.0.0</nexus.version>
         <adventure.version>4.20.0</adventure.version>
     </properties>
 
@@ -48,6 +48,10 @@
             <id>placeholderapi</id>
             <url>https://repo.helpch.at/releases/</url>
         </repository>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -66,13 +70,13 @@
 
         <!-- Nexus core: provides scheduling, config, commands and message formatting at runtime. -->
         <dependency>
-            <groupId>com.nickax.nexus</groupId>
+            <groupId>com.github.MrNickax.Nexus</groupId>
             <artifactId>nexus-api</artifactId>
             <version>${nexus.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>com.nickax.nexus</groupId>
+            <groupId>com.github.MrNickax.Nexus</groupId>
             <artifactId>nexus-bukkit</artifactId>
             <version>${nexus.version}</version>
             <scope>provided</scope>

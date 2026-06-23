@@ -1,21 +1,15 @@
 # =====================================================
 # VIPJoinPlus Configuration
-# Advanced Join/Quit Messages with MiniMessage support
+# Player-facing messages live in the lang/ folder (one file per language).
 # =====================================================
 
 behavior:
-  # Message formatting engine used for join/quit messages.
+  # Message formatting engine used for join/quit and command messages.
   #
-  # Available options:
-  # - MINI_MESSAGE: Recommended. Best for modern formatting, gradients,
-  #   hover/click events, and advanced Adventure components.
-  #   You can easily build MiniMessage text here:
-  #   https://webui.advntr.dev/
-  # - LEGACY: Uses traditional Minecraft formatting with & codes.
-  #   Supports normal colors, formatting codes, and hex colors like &#RRGGBB.
-  # - MIXED: Tries to support both MiniMessage and legacy formatting.
-  #   This mode may be useful for compatibility, but it can be less stable.
-  #   MINI_MESSAGE is still recommended.
+  # - MINI_MESSAGE: Recommended. Gradients, hover/click, hex (<#RRGGBB>) and more.
+  #   Build messages here: https://webui.advntr.dev/
+  # - LEGACY: Traditional ampersand codes (&a, &l) plus &#RRGGBB hex.
+  # - MIXED: Accepts both legacy codes and MiniMessage tags.
   message-formatter-mode: "MINI_MESSAGE"
 
   # Set to true to hide the default Minecraft join message.
@@ -24,45 +18,36 @@ behavior:
   # Set to true to hide the default Minecraft quit message.
   disable-vanilla-quit-message: true
 
-  # Delay before sending the join message, in ticks.
-  # 20 ticks = 1 second.
-  # You can calculate ticks here:
-  # https://www.reimaginednetwork.net/minecrafttickcalculator
+  # Delay before sending the join message, in ticks (20 ticks = 1 second).
   join-message-delay: 0
 
   # Delay before sending the quit message, in ticks.
   quit-message-delay: 0
-  
+
   # Set to true to process join/quit messages asynchronously.
   # This can improve performance on busy servers, but messages may appear slightly delayed.
   async-enabled: false
 
+language:
+  # Default language id, used when a player's client language has no matching file in lang/.
+  # Must match one of the lang/<id>.yml files (without the .yml extension).
+  default: 'en'
+
 groups:
-  # Groups are checked by permission.
-  # If `permission` is not set, it defaults to `group.<group_name>`.
-  # Example: `default` -> `group.default`
-  # If a player matches multiple groups, the group with the highest `priority`
-  # will be used.
+  # Groups are matched by permission. If `permission` is not set, it defaults to
+  # `group.<group_name>` (e.g. `vip` -> `group.vip`). When a player matches several
+  # groups, the one with the highest `priority` wins.
+  #
+  # The join/quit text for each group lives in the lang/<locale>.yml files under
+  # groups.<group_name>.join / groups.<group_name>.quit, so every online player sees
+  # the message in their own client language. Leave a message empty there to send nothing.
   vip:
     priority: 1
     permission: "group.vip"
-    join:
-      - "<gold>✦ VIP</gold> <gradient:#ffd700:#ff9900>%player_name% joined the server!</gradient>"
-    quit:
-      - "<gold>✦ VIP</gold> <gradient:#ffd700:#ff9900>%player_name% left the server!</gradient>"
 
-  # Set join/quit to [] to disable that message for the group.
-  # If join/quit is empty and vanilla messages are disabled, nothing will be sent.
   default:
     priority: 0
-    join:
-      - "<gray>%player_name% joined the server!</gray>"
-    quit: []
-    
-messages:
-  # Message sent to the player after successfully reloading the plugin configuration.
-  # Supports the message formatter mode configured in behavior.message-formatter-mode.
-  reload: '<green>VIPJoinPlus has been reloaded!</green>'
-  
-  # Message sent when a player lacks permission to use a command.
-  no-permission: '<red>You do not have permission to use this command!</red>'
+
+# Verbose debug logging to the console (group matching, message delivery, reloads).
+# Turn this on to diagnose behaviour, then turn it back off.
+debug: false

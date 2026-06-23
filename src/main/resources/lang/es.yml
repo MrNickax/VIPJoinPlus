@@ -1,0 +1,21 @@
+# VIPJoinPlus — Mensajes en español.
+# El formato sigue behavior.message-formatter-mode en config.yml (MINI_MESSAGE por defecto).
+# Placeholder: {player_name}. Los %placeholders% de PlaceholderAPI también funcionan si está instalado.
+
+reload: '<green>¡VIPJoinPlus se ha recargado!</green>'
+no-permission: '<red>¡No tienes permiso para usar este comando!</red>'
+
+# Mensajes de entrada/salida por grupo. Cada id de grupo debe coincidir con uno en config.yml.
+# Cada línea se muestra a todos los jugadores conectados en su propio idioma. Deja un valor
+# vacío ('') para no enviar nada en ese grupo/evento.
+groups:
+  vip:
+    join:
+      - "<gold>✦ VIP</gold> <gradient:#ffd700:#ff9900>¡{player_name} se ha unido al servidor!</gradient>"
+    quit:
+      - "<gold>✦ VIP</gold> <gradient:#ffd700:#ff9900>¡{player_name} ha salido del servidor!</gradient>"
+
+  default:
+    join:
+      - "<gray>¡{player_name} se ha unido al servidor!</gray>"
+    quit: ''
