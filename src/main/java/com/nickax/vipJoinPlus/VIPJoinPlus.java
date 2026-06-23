@@ -50,6 +50,10 @@ public final class VIPJoinPlus extends JavaPlugin {
      */
     @Override
     public void onDisable() {
+        if (nexus != null) {
+            nexus.commands().unregister(this);
+        }
+
         registeredListeners.forEach(HandlerList::unregisterAll);
         registeredListeners.clear();
 
@@ -160,6 +164,6 @@ public final class VIPJoinPlus extends JavaPlugin {
      * Registers the {@code /vipjoinplus} command through the Nexus command engine.
      */
     private void registerCommands() {
-        nexus.commands().register(new VIPJoinPlusCommand(this).build());
+        nexus.commands().register(this, new VIPJoinPlusCommand(this).build());
     }
 }

@@ -18,7 +18,6 @@ public class MainConfiguration {
 
     private final JavaPlugin plugin;
     private final BukkitNexus nexus;
-
     private Config config;
 
     /**
