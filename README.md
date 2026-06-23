@@ -1,6 +1,6 @@
 # VIPJoinPlus
 
-Modern, lightweight and fully customizable join & quit message plugin — with per-player
+Modern, lightweight and fully customizable join & quit message plugin, with per-player
 languages, MiniMessage formatting and permission-based VIP ranks.
 
 Give your VIPs and ranked players the spotlight they deserve, and show every player the
@@ -8,7 +8,7 @@ join/quit message in their own client language.
 
 ## Features
 
-- **Per-player languages** — each online player sees the message in their own language
+- **Per-player languages** each online player sees the message in their own language
   (`lang/<locale>.yml`; English & Spanish included).
 - **Permission-based groups** with a smart priority system.
 - **Modern formatting** with MiniMessage (gradients, HEX, hover & click events).
@@ -17,7 +17,7 @@ join/quit message in their own client language.
 - Optionally hide the default vanilla join & quit messages.
 - Configurable join & quit message delays.
 - Async & performance-friendly.
-- Reload-safe (PlugMan-friendly) — no stale or duplicated messages.
+- Reload-safe (PlugMan-friendly) no stale or duplicated messages.
 - Built-in debug mode.
 
 ## Requirements
@@ -38,9 +38,9 @@ join/quit message in their own client language.
 
 ## Configuration
 
-- `config.yml` — group definitions (priority + permission), formatting mode, vanilla-message
+- `config.yml` group definitions (priority + permission), formatting mode, vanilla-message
   toggles, delays, async and debug.
-- `lang/<locale>.yml` — the join/quit text per group (`groups.<id>.join` / `groups.<id>.quit`)
+- `lang/<locale>.yml` the join/quit text per group (`groups.<id>.join` / `groups.<id>.quit`)
   and command messages, one file per language. Add a new language by copying `en.yml` to
   `lang/<id>.yml` and translating it.
 
